@@ -250,8 +250,8 @@ export default function ImageCollage() {
   }
 
   return (
-    <div className="h-[100dvh] bg-black flex flex-col md:flex-row overflow-hidden">
-      <div className="flex-none h-[45vw] md:flex-1 md:h-auto flex items-center justify-center p-4 min-h-0 min-w-0 order-1 md:order-2">
+    <div className="fixed inset-0 bg-black flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-none h-[100vw] md:flex-1 md:h-auto flex items-center justify-center p-4 min-w-0 order-1 md:order-2">
         <div ref={containerRef} className="h-full aspect-square max-w-full relative overflow-hidden">
           {images.length === 0 && (
             <div
