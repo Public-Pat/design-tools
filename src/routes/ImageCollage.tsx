@@ -250,8 +250,8 @@ export default function ImageCollage() {
   }
 
   return (
-    <div className="h-screen bg-black flex flex-col md:flex-row overflow-hidden">
-      <div className="flex-1 flex items-center justify-center p-4 min-h-0 min-w-0 order-1 md:order-2">
+    <div className="h-[100dvh] bg-black flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-none h-[45vw] md:flex-1 md:h-auto flex items-center justify-center p-4 min-h-0 min-w-0 order-1 md:order-2">
         <div ref={containerRef} className="h-full aspect-square max-w-full relative overflow-hidden">
           {images.length === 0 && (
             <div
@@ -271,7 +271,7 @@ export default function ImageCollage() {
         </div>
       </div>
 
-      <div className="w-full md:w-64 flex-shrink-0 overflow-y-auto px-[26px] pt-[26px] pb-[26px] flex flex-col gap-6 order-2 md:order-1">
+      <div className="w-full md:w-64 flex-shrink-0 flex-1 md:flex-none overflow-y-auto px-[26px] pt-[26px] pb-[26px] flex flex-col gap-6 order-2 md:order-1">
         <div className="h-6 flex items-center">
           <Link to="/" className="text-white hover:text-gray-300 text-xs underline">← Home</Link>
         </div>

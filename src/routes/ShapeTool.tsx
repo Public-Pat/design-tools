@@ -132,8 +132,8 @@ export default function ShapeTool() {
   const m = Math.PI / count
 
   return (
-    <div className="h-screen bg-black flex flex-col md:flex-row overflow-hidden">
-      <div className="flex-none md:flex-1 flex items-center justify-center min-w-0 order-1 md:order-2 w-full md:p-4 h-[100vw] md:h-full">
+    <div className="h-[100dvh] bg-black flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-none h-[45vw] md:flex-1 md:h-full flex items-center justify-center min-w-0 order-1 md:order-2 w-full md:p-4">
         <svg ref={svgRef} viewBox="-300 -300 600 600" className="w-full h-full aspect-square max-h-full max-w-full">
           <rect x="-300" y="-300" width="600" height="600" fill="black" />
 

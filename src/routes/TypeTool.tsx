@@ -213,8 +213,8 @@ export default function TypeTool() {
   }, [])
 
   return (
-    <div className="h-screen bg-black flex flex-col md:flex-row overflow-hidden">
-      <div className="flex-none md:flex-1 flex items-center justify-center min-w-0 order-1 md:order-2 w-full md:p-4 h-[100vw] md:h-full">
+    <div className="h-[100dvh] bg-black flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-none h-[45vw] md:flex-1 md:h-full flex items-center justify-center min-w-0 order-1 md:order-2 w-full md:p-4">
         <div className="w-full h-full aspect-square max-h-full max-w-full">
           <CircularTypeCanvas
             ref={canvasRef}
