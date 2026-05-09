@@ -157,9 +157,45 @@ export default function ShapeTool() {
   }), [count, o])
 
   return (
-    <div className="h-screen bg-black flex overflow-hidden">
+    <div className="h-screen bg-black flex flex-col md:flex-row overflow-hidden">
+      {/* Preview — top on mobile */}
+      <div className="flex-none md:flex-1 flex items-center justify-center p-4 min-w-0 order-1 md:order-2" style={{ height: '45vw', maxHeight: '60vh' }}>
+        <svg
+          ref={svgRef}
+          viewBox="-300 -300 600 600"
+          className="h-full aspect-square max-w-full"
+        >
+          <rect x="-300" y="-300" width="600" height="600" fill="black" />
+          {layers[2] && outerCircles.map(({ cx, cy, j }) => (
+            <circle key={j} cx={cx} cy={cy} r={Ad} fill={colors[2]} />
+          ))}
+          {layers[0] && primaryItems.map(({ angleDeg, j }) => (
+            <g key={j} transform={`rotate(${angleDeg})`}>
+              {primaryShape === 'flower' && (
+                <g transform={`scale(${scaleFlower}) translate(-${nn},-${nn})`}>
+                  <path d={FLOWER_PATH} fill={colors[0]} />
+                </g>
+              )}
+              {primaryShape === 'bone' && (
+                <g transform={`scale(${scaleBone}) translate(-${wi},-${Xn})`}>
+                  <path d={BONE_PATH} fill={colors[0]} />
+                </g>
+              )}
+              {primaryShape === 'spike' && (
+                <path d={spikePath(go, spikeW)} fill={colors[0]} />
+              )}
+            </g>
+          ))}
+          {layers[1] && highlightItems.map(({ cx, cy, deg, j }) => (
+            <g key={j} transform={`translate(${cx},${cy}) rotate(${deg})`}>
+              <HighlightShapeMark type={highlightShape} size={Ld} fill={colors[1]} />
+            </g>
+          ))}
+        </svg>
+      </div>
+
       {/* Controls */}
-      <div className="w-64 flex-shrink-0 overflow-y-auto px-6 pt-4 pb-6 space-y-3">
+      <div className="w-full md:w-64 flex-shrink-0 flex-1 md:flex-none overflow-y-auto px-6 pt-4 pb-6 space-y-3 order-2 md:order-1">
         <div>
           <Link to="/" className="text-white hover:text-gray-300 text-xs underline">← Home</Link>
         </div>
@@ -268,47 +304,6 @@ export default function ShapeTool() {
         </div>
       </div>
 
-      {/* Preview */}
-      <div className="flex-1 flex items-center justify-center p-4 min-h-0 min-w-0">
-        <svg
-          ref={svgRef}
-          viewBox="-300 -300 600 600"
-          className="h-full aspect-square max-w-full"
-        >
-          <rect x="-300" y="-300" width="600" height="600" fill="black" />
-
-          {/* Outer circles */}
-          {layers[2] && outerCircles.map(({ cx, cy, j }) => (
-            <circle key={j} cx={cx} cy={cy} r={Ad} fill={colors[2]} />
-          ))}
-
-          {/* Primary shapes */}
-          {layers[0] && primaryItems.map(({ angleDeg, j }) => (
-            <g key={j} transform={`rotate(${angleDeg})`}>
-              {primaryShape === 'flower' && (
-                <g transform={`scale(${scaleFlower}) translate(-${nn},-${nn})`}>
-                  <path d={FLOWER_PATH} fill={colors[0]} />
-                </g>
-              )}
-              {primaryShape === 'bone' && (
-                <g transform={`scale(${scaleBone}) translate(-${wi},-${Xn})`}>
-                  <path d={BONE_PATH} fill={colors[0]} />
-                </g>
-              )}
-              {primaryShape === 'spike' && (
-                <path d={spikePath(go, spikeW)} fill={colors[0]} />
-              )}
-            </g>
-          ))}
-
-          {/* Highlight ring */}
-          {layers[1] && highlightItems.map(({ cx, cy, deg, j }) => (
-            <g key={j} transform={`translate(${cx},${cy}) rotate(${deg})`}>
-              <HighlightShapeMark type={highlightShape} size={Ld} fill={colors[1]} />
-            </g>
-          ))}
-        </svg>
-      </div>
     </div>
   )
 }

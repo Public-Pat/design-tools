@@ -239,14 +239,14 @@ export default function TypeTool() {
   return (
     <div className="h-screen bg-black flex flex-col md:flex-row overflow-hidden">
       {/* Preview */}
-      <div className="flex-1 flex items-center justify-center p-4 min-h-0 min-w-0 order-1 md:order-2">
+      <div className="flex-none md:flex-1 flex items-center justify-center p-4 min-w-0 order-1 md:order-2" style={{ height: '45vw', maxHeight: '60vh' }}>
         <div className="h-full aspect-square max-w-full">
           <CircularTypeCanvas ref={canvasRef} rings={rings} globalRotation={rotation[0]} bgColor={palette.bg} />
         </div>
       </div>
 
       {/* Controls */}
-      <div className="w-full md:w-64 flex-shrink-0 overflow-y-auto px-[26px] pt-[26px] pb-[26px] flex flex-col gap-6 order-2 md:order-1">
+      <div className="w-full md:w-64 flex-shrink-0 flex-1 md:flex-none overflow-y-auto px-[26px] pt-[26px] pb-[26px] flex flex-col gap-6 order-2 md:order-1">
         <div className="h-6 flex items-center">
           <Link to="/" className="text-white hover:text-gray-300 text-xs underline">← Home</Link>
         </div>
