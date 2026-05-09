@@ -8,13 +8,13 @@ export default function Home() {
         fontFamily: "'Inter', sans-serif",
         fontWeight: 900,
         fontStyle: 'normal',
-        fontSize: 'clamp(32px, 4.72vw, 68px)',
+        fontSize: 'clamp(26px, 4.72vw, 68px)',
         lineHeight: 1,
         letterSpacing: '0.4218px',
         color: 'white',
       }}
     >
-      <p className="absolute whitespace-pre" style={{ left: '32px', top: '27px' }}>
+      <p className="absolute whitespace-pre" style={{ left: 'clamp(16px, 4vw, 32px)', top: '27px' }}>
         {'Public Websites  '}
         <br />
         Design Tools
@@ -22,7 +22,7 @@ export default function Home() {
 
       <div
         className="absolute flex flex-col items-start"
-        style={{ left: '32px', bottom: '32px', gap: '16px' }}
+        style={{ left: 'clamp(16px, 4vw, 32px)', bottom: '32px', gap: '16px' }}
       >
         <Link
           to="/type-tool"

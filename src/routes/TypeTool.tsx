@@ -15,10 +15,11 @@ const CX = SVG_SIZE / 2
 const CY = SVG_SIZE / 2
 const FONT_FAMILY = "'Stardos Stencil', 'Allerta Stencil', sans-serif"
 
+let _measureCtx: CanvasRenderingContext2D | null = null
 function measureChars(text: string, fontSize: number, fontFamily: string): number[] {
-  const ctx = document.createElement('canvas').getContext('2d')!
-  ctx.font = `${fontSize}px ${fontFamily}`
-  return text.split('').map((ch) => ctx.measureText(ch).width)
+  if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d')!
+  _measureCtx.font = `${fontSize}px ${fontFamily}`
+  return text.split('').map((ch) => _measureCtx!.measureText(ch).width)
 }
 
 function wordFontSize(word: string, wordIndex: number, baseFontSize: number, variance: number): number {
@@ -26,37 +27,49 @@ function wordFontSize(word: string, wordIndex: number, baseFontSize: number, var
   let hash = 0
   for (let i = 0; i < word.length; i++) hash = (hash * 31 + word.charCodeAt(i)) & 0x7fffffff
   hash = Math.abs(hash ^ (wordIndex * 1234567)) % 1000
-  const t = hash / 1000
   const lo = baseFontSize * (1 - variance * 0.5)
   const hi = baseFontSize * (1 + variance * 0.5)
-  return Math.max(4, Math.round(lo + t * (hi - lo)))
+  return Math.max(4, Math.round(lo + (hash / 1000) * (hi - lo)))
 }
 
-interface Ring {
+interface RingConfig {
+  label: string
   text: string
   radius: number
-  rotationOffset: number
   visible: boolean
+}
+
+interface RingProps {
+  text: string
+  radius: number
   color: string
   fontSize: number
   sizeVariance: number
   tracking: number
   wordGap: number
+  rotationDeg: number
 }
 
-function CircularRing({ text, radius, rotationDeg, color, fontSize, sizeVariance, fontFamily, tracking, wordGap }: {
-  text: string; radius: number; rotationDeg: number; color: string
-  fontSize: number; sizeVariance: number; fontFamily: string; tracking: number; wordGap: number
-}) {
+const INITIAL_RINGS: RingConfig[] = [
+  { label: 'Circle 1 (inner)', text: 'BK143 KY235 GN54', radius: 80, visible: true },
+  { label: 'Circle 2', text: 'GN54 GW71 ML83', radius: 110, visible: true },
+  { label: 'Circle 3', text: 'GN54 GW71 ML83 GN80', radius: 140, visible: true },
+  { label: 'Circle 4 (outer)', text: 'GN54 GW71 ML83 GN80 BK143 KY235', radius: 170, visible: true },
+]
+
+const RAND_RADIUS_BASE = [30, 80, 150, 260]
+const RAND_RADIUS_RANGE = [180, 180, 180, 100]
+
+function CircularRing({ text, radius, rotationDeg, color, fontSize, sizeVariance, tracking, wordGap }: RingProps) {
   if (!text || radius < 5) return null
   const words = text.split(/\s+/).filter(Boolean)
   if (words.length === 0) return null
 
   const fontSizes = words.map((w, i) => wordFontSize(w, i, fontSize, sizeVariance))
-  const wordAngles = words.map((w, i) => {
-    const fs = fontSizes[i]
-    return measureChars(w, fs, fontFamily).reduce((sum, cw) => sum + cw * tracking / radius, 0)
-  })
+  const wordCharWidths = words.map((w, i) =>
+    measureChars(w, fontSizes[i], FONT_FAMILY).map((cw) => cw * tracking / radius)
+  )
+  const wordAngles = wordCharWidths.map((cws) => cws.reduce((sum, cw) => sum + cw, 0))
   const gapAngle = wordGap * (Math.PI / 180)
   const totalAngle = wordAngles.reduce((s, a) => s + a, 0) + gapAngle * words.length
   if (totalAngle <= 0) return null
@@ -70,13 +83,11 @@ function CircularRing({ text, radius, rotationDeg, color, fontSize, sizeVariance
   outer: while (angle < endAngle && iter < 200) {
     iter++
     for (let wi = 0; wi < words.length; wi++) {
-      const word = words[wi]
-      const fs = fontSizes[wi]
-      const charWidths = measureChars(word, fs, fontFamily).map((cw) => cw * tracking / radius)
-      for (let ci = 0; ci < word.length; ci++) {
+      const charWidths = wordCharWidths[wi]
+      for (let ci = 0; ci < words[wi].length; ci++) {
         const mid = angle + charWidths[ci] / 2
         if (mid >= endAngle) break outer
-        chars.push({ ch: word[ci], angleDeg: mid * (180 / Math.PI), size: fs })
+        chars.push({ ch: words[wi][ci], angleDeg: mid * (180 / Math.PI), size: fontSizes[wi] })
         angle += charWidths[ci]
       }
       angle += gapAngle
@@ -96,7 +107,7 @@ function CircularRing({ text, radius, rotationDeg, color, fontSize, sizeVariance
             dominantBaseline="auto"
             fill={color}
             fontSize={`${size}px`}
-            fontFamily={fontFamily}
+            fontFamily={FONT_FAMILY}
             style={{ userSelect: 'none' }}
           >
             {ch}
@@ -111,8 +122,8 @@ interface CircularTypeHandle {
   exportAsJPG: () => void
 }
 
-const CircularTypeCanvas = forwardRef<CircularTypeHandle, { rings: Ring[]; globalRotation: number; bgColor: string }>(
-  ({ rings, globalRotation, bgColor }, ref) => {
+const CircularTypeCanvas = forwardRef<CircularTypeHandle, { rings: RingConfig[]; globalRotation: number; bgColor: string; color: string } & Pick<RingProps, 'fontSize' | 'sizeVariance' | 'tracking' | 'wordGap'>>(
+  ({ rings, globalRotation, bgColor, color, fontSize, sizeVariance, tracking, wordGap }, ref) => {
     const svgRef = useRef<SVGSVGElement>(null)
 
     useImperativeHandle(ref, () => ({
@@ -147,7 +158,7 @@ const CircularTypeCanvas = forwardRef<CircularTypeHandle, { rings: Ring[]; globa
         height={SVG_SIZE}
         viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
         xmlns="http://www.w3.org/2000/svg"
-        style={{ display: 'block', width: '100%', height: 'auto' }}
+        style={{ display: 'block', width: '100%', height: '100%' }}
       >
         <rect width={SVG_SIZE} height={SVG_SIZE} fill={bgColor} />
         {rings.map((ring, i) =>
@@ -156,13 +167,12 @@ const CircularTypeCanvas = forwardRef<CircularTypeHandle, { rings: Ring[]; globa
               key={i}
               text={ring.text}
               radius={ring.radius}
-              rotationDeg={globalRotation + ring.rotationOffset}
-              color={ring.color}
-              fontSize={ring.fontSize}
-              sizeVariance={ring.sizeVariance}
-              fontFamily={FONT_FAMILY}
-              tracking={ring.tracking}
-              wordGap={ring.wordGap}
+              rotationDeg={globalRotation}
+              color={color}
+              fontSize={fontSize}
+              sizeVariance={sizeVariance}
+              tracking={tracking}
+              wordGap={wordGap}
             />
           ) : null
         )}
@@ -172,117 +182,88 @@ const CircularTypeCanvas = forwardRef<CircularTypeHandle, { rings: Ring[]; globa
 )
 
 export default function TypeTool() {
+  const [rings, setRings] = useState<RingConfig[]>(INITIAL_RINGS)
   const [rotation, setRotation] = useState([0])
   const [paletteIdx, setPaletteIdx] = useState(0)
-  const palette = COLOR_PALETTES[paletteIdx]
-
-  const [r1, setR1] = useState([80])
-  const [r2, setR2] = useState([110])
-  const [r3, setR3] = useState([140])
-  const [r4, setR4] = useState([170])
-
-  const [t1, setT1] = useState('BK143 KY235 GN54')
-  const [t2, setT2] = useState('GN54 GW71 ML83')
-  const [t3, setT3] = useState('GN54 GW71 ML83 GN80')
-  const [t4, setT4] = useState('GN54 GW71 ML83 GN80 BK143 KY235')
-
-  const [v1, setV1] = useState(true)
-  const [v2, setV2] = useState(true)
-  const [v3, setV3] = useState(true)
-  const [v4, setV4] = useState(true)
-
   const [tracking, setTracking] = useState([1.3])
   const [fontSize, setFontSize] = useState([28])
   const [sizeVariance, setSizeVariance] = useState([1])
   const [wordGap, setWordGap] = useState([8])
-
   const canvasRef = useRef<CircularTypeHandle>(null)
+  const palette = COLOR_PALETTES[paletteIdx]
 
-  const rings: Ring[] = [
-    { text: t1, radius: r1[0], rotationOffset: 0, visible: v1, color: palette.text, fontSize: fontSize[0], sizeVariance: sizeVariance[0], tracking: tracking[0], wordGap: wordGap[0] },
-    { text: t2, radius: r2[0], rotationOffset: 0, visible: v2, color: palette.text, fontSize: fontSize[0], sizeVariance: sizeVariance[0], tracking: tracking[0], wordGap: wordGap[0] },
-    { text: t3, radius: r3[0], rotationOffset: 0, visible: v3, color: palette.text, fontSize: fontSize[0], sizeVariance: sizeVariance[0], tracking: tracking[0], wordGap: wordGap[0] },
-    { text: t4, radius: r4[0], rotationOffset: 0, visible: v4, color: palette.text, fontSize: fontSize[0], sizeVariance: sizeVariance[0], tracking: tracking[0], wordGap: wordGap[0] },
-  ]
+  function updateRing<K extends keyof RingConfig>(i: number, key: K, value: RingConfig[K]) {
+    setRings((prev) => prev.map((r, j) => (j === i ? { ...r, [key]: value } : r)))
+  }
 
   const randomize = useCallback(() => {
     setPaletteIdx(Math.floor(Math.random() * COLOR_PALETTES.length))
     setRotation([Math.floor(Math.random() * 360)])
-    setR1([Math.floor(Math.random() * 180) + 30])
-    setR2([Math.floor(Math.random() * 180) + 80])
-    setR3([Math.floor(Math.random() * 180) + 150])
-    setR4([Math.floor(Math.random() * 100) + 260])
-    setV1(Math.random() > 0.2)
-    setV2(Math.random() > 0.2)
-    setV3(Math.random() > 0.2)
-    setV4(Math.random() > 0.2)
+    setRings((prev) =>
+      prev.map((r, i) => ({
+        ...r,
+        radius: RAND_RADIUS_BASE[i] + Math.floor(Math.random() * RAND_RADIUS_RANGE[i]),
+        visible: Math.random() > 0.2,
+      }))
+    )
     setTracking([Math.round((0.8 + Math.random() * 0.6) * 100) / 100])
     setFontSize([Math.floor(Math.random() * 20) + 10])
     setSizeVariance([Math.round(Math.random() * 100) / 100])
     setWordGap([Math.floor(Math.random() * 20)])
   }, [])
 
-  const layers = [
-    { label: 'Circle 1 (inner)', vis: v1, setVis: setV1, val: r1, set: setR1 },
-    { label: 'Circle 2', vis: v2, setVis: setV2, val: r2, set: setR2 },
-    { label: 'Circle 3', vis: v3, setVis: setV3, val: r3, set: setR3 },
-    { label: 'Circle 4 (outer)', vis: v4, setVis: setV4, val: r4, set: setR4 },
-  ]
-
-  const textInputs = [
-    { label: 'TEXT: Circle 1 (inner)', value: t1, set: setT1 },
-    { label: 'TEXT: Circle 2', value: t2, set: setT2 },
-    { label: 'TEXT: Circle 3', value: t3, set: setT3 },
-    { label: 'TEXT: Circle 4 (outer)', value: t4, set: setT4 },
-  ]
-
   return (
     <div className="h-screen bg-black flex flex-col md:flex-row overflow-hidden">
-      {/* Preview */}
-      <div className="flex-none md:flex-1 flex items-center justify-center p-4 min-w-0 order-1 md:order-2" style={{ height: '45vw', maxHeight: '60vh' }}>
-        <div className="h-full aspect-square max-w-full">
-          <CircularTypeCanvas ref={canvasRef} rings={rings} globalRotation={rotation[0]} bgColor={palette.bg} />
+      <div className="flex-none md:flex-1 flex items-center justify-center min-w-0 order-1 md:order-2 w-full md:p-4 h-[100vw] md:h-full">
+        <div className="w-full h-full aspect-square max-h-full max-w-full">
+          <CircularTypeCanvas
+            ref={canvasRef}
+            rings={rings}
+            globalRotation={rotation[0]}
+            bgColor={palette.bg}
+            color={palette.text}
+            fontSize={fontSize[0]}
+            sizeVariance={sizeVariance[0]}
+            tracking={tracking[0]}
+            wordGap={wordGap[0]}
+          />
         </div>
       </div>
 
-      {/* Controls */}
       <div className="w-full md:w-64 flex-shrink-0 flex-1 md:flex-none overflow-y-auto px-[26px] pt-[26px] pb-[26px] flex flex-col gap-6 order-2 md:order-1">
         <div className="h-6 flex items-center">
           <Link to="/" className="text-white hover:text-gray-300 text-xs underline">← Home</Link>
         </div>
 
-        {/* Layer Visibility */}
         <div className="flex flex-col gap-1">
-          <label className="block mb-0 text-xs text-white">Layer Visibility</label>
+          <label className="block text-xs text-white">Layer Visibility</label>
           <div className="flex flex-col gap-1 mt-3">
-            {layers.map(({ label, vis, setVis }) => (
+            {rings.map((ring, i) => (
               <button
-                key={label}
-                onClick={() => setVis(!vis)}
-                className={`w-full flex items-center justify-between p-[7px] border text-xs focus:outline-none transition-colors ${vis ? 'border-white bg-white text-black' : 'border-gray-700 bg-transparent text-gray-500 hover:border-gray-400'}`}
+                key={ring.label}
+                onClick={() => updateRing(i, 'visible', !ring.visible)}
+                className={`w-full flex items-center justify-between p-[7px] border text-xs focus:outline-none transition-colors ${ring.visible ? 'border-white bg-white text-black' : 'border-gray-700 bg-transparent text-gray-500 hover:border-gray-400'}`}
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full flex-none" style={{ background: vis ? palette.text : '#4b5563' }} />
-                  <span>{label}</span>
+                  <div className="w-2 h-2 rounded-full flex-none" style={{ background: ring.visible ? palette.text : '#4b5563' }} />
+                  <span>{ring.label}</span>
                 </div>
-                <span className="text-[9px] opacity-60 tracking-[0.167px]">{vis ? 'on' : 'off'}</span>
+                <span className="text-[9px] opacity-60 tracking-[0.167px]">{ring.visible ? 'on' : 'off'}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Circle Size */}
         <div className="flex flex-col gap-[8px]">
           <label className="block text-xs text-white">Circle Size</label>
-          {layers.map(({ label, val, set }) => (
-            <div key={label} className="flex flex-col gap-1">
-              <label className="block text-xs text-white">{label}: {val[0]}px</label>
-              <Slider value={val} onChange={set} min={20} max={380} step={1} />
+          {rings.map((ring, i) => (
+            <div key={ring.label} className="flex flex-col gap-1">
+              <label className="block text-xs text-white">{ring.label}: {ring.radius}px</label>
+              <Slider value={[ring.radius]} onChange={(v) => updateRing(i, 'radius', v[0])} min={20} max={380} step={1} />
             </div>
           ))}
         </div>
 
-        {/* Positioning */}
         <div className="flex flex-col gap-[8px]">
           <label className="block text-xs text-white">Positioning Settings</label>
           <div className="flex flex-col gap-1">
@@ -313,7 +294,6 @@ export default function TypeTool() {
           </div>
         </div>
 
-        {/* Color Scheme */}
         <div className="flex flex-col gap-1">
           <label className="block text-xs text-white">Color Scheme</label>
           <div className="flex gap-2 mt-3">
@@ -328,14 +308,13 @@ export default function TypeTool() {
           </div>
         </div>
 
-        {/* Text Inputs */}
         <div className="flex flex-col gap-2">
-          {textInputs.map(({ label, value, set }) => (
-            <div key={label} className="flex flex-col gap-1">
-              <label className="block text-xs text-white">{label}</label>
+          {rings.map((ring, i) => (
+            <div key={ring.label} className="flex flex-col gap-1">
+              <label className="block text-xs text-white">TEXT: {ring.label}</label>
               <textarea
-                value={value}
-                onChange={(e) => set(e.target.value)}
+                value={ring.text}
+                onChange={(e) => updateRing(i, 'text', e.target.value)}
                 className="w-full p-1.5 border border-white bg-transparent text-white focus:outline-none focus:ring-2 focus:ring-white text-xs placeholder-gray-500"
                 rows={2}
               />
@@ -343,7 +322,6 @@ export default function TypeTool() {
           ))}
         </div>
 
-        {/* Actions */}
         <div className="flex flex-col gap-2">
           <button
             onClick={() => canvasRef.current?.exportAsJPG()}
