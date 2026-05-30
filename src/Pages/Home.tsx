@@ -43,6 +43,13 @@ export default function Home() {
           >
             Shape Tool 0.1.0 →
           </Link>
+          <Link
+            to="/bold-type-logo"
+            className="whitespace-nowrap hover:opacity-70 transition-opacity"
+            style={{ color: 'white', textDecoration: 'none' }}
+          >
+            Bold Logo Tool 0.1.0 →
+          </Link>
         </div>
       </div>
     </div>
