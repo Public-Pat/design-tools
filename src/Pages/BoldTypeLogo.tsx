@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Slider from '../components/Slider';
 
@@ -16,27 +16,36 @@ export default function LogoTool() {
   const [charCenters, setCharCenters] = useState<number[]>([]);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const el = textRef.current;
-      if (!el) return;
-      const str = text || 'LOGO';
-      const centers: number[] = [];
-      for (let i = 0; i < str.length; i++) {
-        try {
-          const ext = el.getExtentOfChar(i);
-          centers.push(ext.x + ext.width / 2);
-        } catch { /* skip unmeasurable chars */ }
-      }
-      setCharCenters(centers);
-    });
-    return () => cancelAnimationFrame(frame);
+    const measure = () => {
+      const frame = requestAnimationFrame(() => {
+        const el = textRef.current;
+        if (!el) return;
+        const str = text || 'LOGO';
+        const centers: number[] = [];
+        for (let i = 0; i < str.length; i++) {
+          try {
+            const ext = el.getExtentOfChar(i);
+            centers.push(ext.x + ext.width / 2);
+          } catch { /* skip unmeasurable chars */ }
+        }
+        setCharCenters(centers);
+      });
+      return frame;
+    };
+
+    const frame = measure();
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', measure);
+    };
   }, [text, fontSize, letterSpacing]);
 
   const starY = -(fontSize * 0.68 + 14);
   const starSize = Math.min(22, Math.max(10, fontSize * 0.22));
 
 
-  const sharedTextProps = {
+  const sharedTextProps = useMemo(() => ({
     x: 0,
     y: 0,
     textAnchor: 'middle' as const,
@@ -45,29 +54,30 @@ export default function LogoTool() {
     fontWeight: 900 as const,
     fontSize,
     letterSpacing: letterSpacing[0],
-  };
+  }), [fontSize, letterSpacing]);
 
   // Build extrude layers back-to-front so deeper layers are fully occluded by shallower ones.
   // Layer i=0 is the deepest (largest offset), i=depth-1 is the shallowest side face.
-  const extrudeLayers = extruded
-    ? Array.from({ length: depth }, (_, i) => {
-        const offset = depth - i;
-        return (
-          <text
-            key={i}
-            {...sharedTextProps}
-            transform={`translate(${offset}, ${offset})`}
-            fill="black"
-            stroke="#ff0000"
-            strokeWidth={strokeWeight[0]}
-            strokeLinejoin="round"
-            paintOrder="stroke fill"
-          >
-            {text || 'LOGO'}
-          </text>
-        );
-      })
-    : null;
+  const extrudeLayers = useMemo(() => {
+    if (!extruded) return null;
+    return Array.from({ length: depth }, (_, i) => {
+      const offset = depth - i;
+      return (
+        <text
+          key={i}
+          {...sharedTextProps}
+          transform={`translate(${offset}, ${offset})`}
+          fill="black"
+          stroke="#ff0000"
+          strokeWidth={strokeWeight[0]}
+          strokeLinejoin="round"
+          paintOrder="stroke fill"
+        >
+          {text || 'LOGO'}
+        </text>
+      );
+    });
+  }, [extruded, depth, sharedTextProps, strokeWeight, text]);
 
   return (
     <div className="fixed inset-0 bg-black flex flex-col md:flex-row overflow-hidden">
