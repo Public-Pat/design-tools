@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react'
 import { Link } from 'react-router-dom'
 
-type MaskType = 'none' | 'cross' | 'circle' | 'triptych'
+type MaskType = 'none' | 'cross' | 'circle' | 'triptych' | 'letter'
 
 const W = 800
 const H = 800
 
-// Layout constants matching the original
 const IMG_W = 90, IMG_H = 118
 const CROSS_V_SPACING = 70, CROSS_H_SPACING = 69
 const JITTER = 10, ROT_MAX = 0.12
@@ -15,6 +14,35 @@ const CIRCLE_R = 260, CIRCLE_W = 115, CIRCLE_H = 87
 const CIRCLE_JX = 20, CIRCLE_JY = 14
 const CIRCLE_SCALE_MIN = 0.72, CIRCLE_SCALE_MAX = 1.38
 const TRIPTYCH_W = 360, TRIPTYCH_X = (W - TRIPTYCH_W) / 2
+
+const LETTER_BITMAPS: Record<string, string[]> = {
+  A: ['01110','10001','10001','11111','10001','10001','10001'],
+  B: ['11110','10001','10001','11110','10001','10001','11110'],
+  C: ['01110','10001','10000','10000','10000','10001','01110'],
+  D: ['11110','10001','10001','10001','10001','10001','11110'],
+  E: ['11111','10000','10000','11100','10000','10000','11111'],
+  F: ['11111','10000','10000','11100','10000','10000','10000'],
+  G: ['01110','10001','10000','10011','10001','10001','01110'],
+  H: ['10001','10001','10001','11111','10001','10001','10001'],
+  I: ['11111','00100','00100','00100','00100','00100','11111'],
+  J: ['00111','00001','00001','00001','10001','10001','01110'],
+  K: ['10001','10010','10100','11000','10100','10010','10001'],
+  L: ['10000','10000','10000','10000','10000','10000','11111'],
+  M: ['10001','11011','10101','10001','10001','10001','10001'],
+  N: ['10001','11001','10101','10011','10001','10001','10001'],
+  O: ['01110','10001','10001','10001','10001','10001','01110'],
+  P: ['11110','10001','10001','11110','10000','10000','10000'],
+  Q: ['01110','10001','10001','10001','10101','10010','01101'],
+  R: ['11110','10001','10001','11110','10100','10010','10001'],
+  S: ['01110','10001','10000','01110','00001','10001','01110'],
+  T: ['11111','00100','00100','00100','00100','00100','00100'],
+  U: ['10001','10001','10001','10001','10001','10001','01110'],
+  V: ['10001','10001','10001','10001','01010','01010','00100'],
+  W: ['10001','10001','10001','10101','10101','11011','10001'],
+  X: ['10001','01010','01010','00100','01010','01010','10001'],
+  Y: ['10001','01010','01010','00100','00100','00100','00100'],
+  Z: ['11111','00010','00100','01000','01000','10000','11111'],
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -66,6 +94,30 @@ function circleLayout(count: number): ImageSlot[] {
   return shuffle(slots)
 }
 
+function letterLayout(letter: string, count: number): ImageSlot[] {
+  if (count === 0) return []
+  const bitmap = LETTER_BITMAPS[letter.toUpperCase()]
+  if (!bitmap) return []
+  const rows = bitmap.length
+  const cols = bitmap[0].length
+  const cells: { row: number; col: number }[] = []
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      if (bitmap[r][c] === '1') cells.push({ row: r, col: c })
+  if (cells.length === 0) return []
+  const PAD = 80
+  const cellW = (W - PAD * 2) / cols
+  const cellH = (H - PAD * 2) / rows
+  return shuffle(cells).map((cell, i) => ({
+    x: PAD + (cell.col + 0.5) * cellW + rand(-cellW * 0.08, cellW * 0.08),
+    y: PAD + (cell.row + 0.5) * cellH + rand(-cellH * 0.08, cellH * 0.08),
+    rot: rand(-ROT_MAX * 0.6, ROT_MAX * 0.6),
+    w: cellW * 0.9 * rand(0.92, 1.08),
+    h: cellH * 0.9 * rand(0.92, 1.08),
+    imgIdx: i % count,
+  }))
+}
+
 function drawImage(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number, rot: number) {
   ctx.save()
   ctx.translate(x, y)
@@ -85,7 +137,8 @@ const CollageCanvas = forwardRef<CollageHandle, {
   images: HTMLImageElement[]
   maskType: MaskType
   typeText: string
-}>(({ images, maskType, typeText }, ref) => {
+  letterChoice: string
+}>(({ images, maskType, typeText, letterChoice }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const slotsRef = useRef<ImageSlot[]>([])
   const defaultPositionsRef = useRef<{ x: number; y: number; rotation: number; scale: number }[]>([])
@@ -102,6 +155,7 @@ const CollageCanvas = forwardRef<CollageHandle, {
     const count = images.length
     slotsRef.current = maskType === 'cross' ? crossLayout(count)
       : maskType === 'circle' ? circleLayout(count)
+      : maskType === 'letter' ? letterLayout(letterChoice, count)
       : []
     defaultPositionsRef.current = images.map(() => ({
       x: 100 + Math.random() * (W - 200),
@@ -120,11 +174,7 @@ const CollageCanvas = forwardRef<CollageHandle, {
     ctx.fillStyle = 'rgb(245,245,245)'
     ctx.fillRect(0, 0, W, H)
 
-    if (maskType === 'cross') {
-      for (const slot of slotsRef.current) {
-        drawImage(ctx, images[slot.imgIdx], slot.x, slot.y, slot.w, slot.h, slot.rot)
-      }
-    } else if (maskType === 'circle') {
+    if (maskType === 'cross' || maskType === 'circle' || maskType === 'letter') {
       for (const slot of slotsRef.current) {
         drawImage(ctx, images[slot.imgIdx], slot.x, slot.y, slot.w, slot.h, slot.rot)
       }
@@ -183,6 +233,12 @@ const CollageCanvas = forwardRef<CollageHandle, {
   }, [maskType])
 
   useEffect(() => {
+    if (maskType !== 'letter') return
+    randomizePositions()
+    redraw()
+  }, [letterChoice])
+
+  useEffect(() => {
     if (images.length === 0) {
       const canvas = canvasRef.current
       if (canvas) {
@@ -207,6 +263,7 @@ const LAYOUTS: { key: MaskType; label: string }[] = [
   { key: 'cross', label: 'Cross' },
   { key: 'circle', label: 'Circle' },
   { key: 'triptych', label: 'Triptych' },
+  { key: 'letter', label: 'Letter' },
 ]
 
 export default function ImageCollage() {
@@ -214,6 +271,7 @@ export default function ImageCollage() {
   const [maskType, setMaskType] = useState<MaskType>('none')
   const [typeEnabled, setTypeEnabled] = useState(false)
   const [typeText, setTypeText] = useState('')
+  const [letterChoice, setLetterChoice] = useState('A')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const collageRef = useRef<CollageHandle>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -278,7 +336,7 @@ export default function ImageCollage() {
             </div>
           )}
           <div style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, transformOrigin: 'top left', transform: `scale(${scale})` }}>
-            <CollageCanvas ref={collageRef} images={images} maskType={maskType} typeText={typeEnabled ? typeText : ''} />
+            <CollageCanvas ref={collageRef} images={images} maskType={maskType} typeText={typeEnabled ? typeText : ''} letterChoice={letterChoice} />
           </div>
         </div>
       </div>
@@ -304,6 +362,22 @@ export default function ImageCollage() {
               )
             })}
           </div>
+          {maskType === 'letter' && (
+            <div className="mt-3">
+              <label className="text-xs text-white block mb-2">Choose letter</label>
+              <div className="flex flex-wrap gap-1">
+                {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => (
+                  <button
+                    key={l}
+                    onClick={() => setLetterChoice(l)}
+                    className={`w-7 h-7 text-xs flex items-center justify-center border focus:outline-none transition-colors ${letterChoice === l ? 'border-white bg-white text-black' : 'border-gray-700 bg-transparent text-gray-500 hover:border-gray-400'}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-1">
