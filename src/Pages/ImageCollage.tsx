@@ -90,6 +90,14 @@ const CollageCanvas = forwardRef<CollageHandle, {
   const slotsRef = useRef<ImageSlot[]>([])
   const defaultPositionsRef = useRef<{ x: number; y: number; rotation: number; scale: number }[]>([])
 
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = W * dpr
+    canvas.height = H * dpr
+  }, [])
+
   function randomizePositions() {
     const count = images.length
     slotsRef.current = maskType === 'cross' ? crossLayout(count)
@@ -106,7 +114,9 @@ const CollageCanvas = forwardRef<CollageHandle, {
   function redraw() {
     const canvas = canvasRef.current
     if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
     const ctx = canvas.getContext('2d')!
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.fillStyle = 'rgb(245,245,245)'
     ctx.fillRect(0, 0, W, H)
 
@@ -162,7 +172,7 @@ const CollageCanvas = forwardRef<CollageHandle, {
       if (!canvas) return
       const a = document.createElement('a')
       a.download = 'image_collage.jpg'
-      a.href = canvas.toDataURL('image/jpeg', 0.95)
+      a.href = canvas.toDataURL('image/jpeg', 1.0)
       a.click()
     },
   }))
@@ -176,7 +186,9 @@ const CollageCanvas = forwardRef<CollageHandle, {
     if (images.length === 0) {
       const canvas = canvasRef.current
       if (canvas) {
+        const dpr = window.devicePixelRatio || 1
         const ctx = canvas.getContext('2d')!
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
         ctx.fillStyle = 'rgb(245,245,245)'
         ctx.fillRect(0, 0, W, H)
       }
